@@ -24,7 +24,7 @@
         document.body.style.textAlign = "left";
       }
 
-      createUnityInstance(document.querySelector("#unity-canvas"), {
+      window.HorseDaysUnityPromise = createUnityInstance(document.querySelector("#unity-canvas"), {
         dataUrl: "Build/game.data.unityweb",
         frameworkUrl: "Build/game.framework.js.unityweb",
         codeUrl: "Build/game.wasm.unityweb",
@@ -36,5 +36,132 @@
         // devicePixelRatio: 1, // Uncomment this to override low DPI rendering on high DPI displays.
       });
     </script>
-  </body>
+  <script>
+/* HD_NATIVE_INPUT_BRIDGE_V1
+ * Unity WebGL's IMGUI labels are not HTML <input> elements.
+ * Open a native, touch-friendly browser input when Unity invokes
+ * HorseDaysIdentityInput through Assets/Plugins/WebGL/StableIdentity.jslib.
+ */
+(function () {
+  "use strict";
+  var unityGameObject = "Horse Days";
+  var inputKinds = {
+    ReceiveStableName: {title: "牧場名を入力", placeholder: "牧場名（24文字以内）"},
+    ReceivePartnerName: {title: "馬の名前を入力", placeholder: "馬名（18文字以内）"},
+    ReceiveFoalName: {title: "産駒の名前を入力", placeholder: "馬名（18文字以内）"},
+    ReceiveMobileHorseSearch: {title: "馬名を検索", placeholder: "検索する馬名"}
+  };
+  var game = null;
+  var modal = null;
+  var input = null;
+  var method = null;
+  var oldOverflow = "";
+
+  // Set this from the promise returned by the page's createUnityInstance call.
+  if (window.HorseDaysUnityPromise && typeof window.HorseDaysUnityPromise.then === "function") {
+    window.HorseDaysUnityPromise.then(function (instance) {
+      game = instance;
+      window.HorseDaysUnityInstance = instance;
+    }).catch(function (error) {
+      console.error("HorseDays Unity initialization failed:", error);
+    });
+  }
+
+  function send(functionName, value) {
+    var instance = game || window.HorseDaysUnityInstance;
+    if (!instance || typeof instance.SendMessage !== "function") {
+      console.error("HorseDays Unity instance is unavailable for", functionName);
+      return false;
+    }
+    instance.SendMessage(unityGameObject, functionName, value);
+    return true;
+  }
+
+  function makeModal() {
+    modal = document.createElement("div");
+    modal.id = "horse-days-native-input";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-label", "HorseDays 文字入力");
+    modal.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;background:rgba(8,19,15,.77);font-family:system-ui,-apple-system,Meiryo,sans-serif;";
+    modal.innerHTML = '<div style="box-sizing:border-box;width:100%;max-width:420px;padding:22px 18px 18px;border-radius:20px;background:#fffaf0;color:#22392e;box-shadow:0 14px 60px rgba(0,0,0,.4)">' +
+      '<div data-role="title" style="font-size:20px;font-weight:700;margin-bottom:14px"></div>' +
+      '<form data-role="form" autocomplete="off">' +
+      '<input data-role="input" type="text" maxlength="24" enterkeyhint="done" autocomplete="off" autocorrect="off" spellcheck="false" style="box-sizing:border-box;width:100%;min-height:54px;padding:12px;border:2px solid #789c75;border-radius:12px;background:#fff;color:#152b1d;font-size:18px;outline-offset:2px;font-family:inherit" />' +
+      '<div data-role="error" aria-live="polite" style="min-height:20px;margin:7px 2px 2px;font-size:13px;color:#a82424"></div>' +
+      '<div style="display:flex;gap:10px;margin-top:14px">' +
+      '<button data-role="cancel" type="button" style="flex:1;min-height:48px;border:1px solid #c2c6bd;border-radius:12px;background:#edf0e8;color:#334638;font-size:16px;font-weight:600">キャンセル</button>' +
+      '<button data-role="save" type="submit" style="flex:1;min-height:48px;border:0;border-radius:12px;background:#35764d;color:white;font-size:16px;font-weight:700">決定</button></div>' +
+      '</form></div>';
+    input = modal.querySelector('[data-role="input"]');
+    var error = modal.querySelector('[data-role="error"]');
+
+    modal.addEventListener("keydown", function (event) {
+      // Prevent Unity WebGL from consuming the browser input's keystrokes.
+      event.stopPropagation();
+      if (event.key === "Escape") { event.preventDefault(); close(); }
+    }, true);
+    modal.addEventListener("keyup", function (event) { event.stopPropagation(); }, true);
+    modal.addEventListener("keypress", function (event) { event.stopPropagation(); }, true);
+    modal.querySelector('[data-role="cancel"]').addEventListener("click", close);
+    modal.querySelector('[data-role="form"]').addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (event.isComposing) return;
+      var text = input.value.trim();
+      if (method !== "ReceiveMobileHorseSearch" && !text) {
+        error.textContent = "名前を入力してください。";
+        input.focus();
+        return;
+      }
+      if (text.indexOf("<") !== -1 || text.indexOf(">") !== -1) {
+        error.textContent = "< と > は使用できません。";
+        input.focus();
+        return;
+      }
+      if (send(method, text)) close();
+      else error.textContent = "ゲームの読み込みが完了していません。";
+    });
+    return modal;
+  }
+
+  function close() {
+    if (!modal) return;
+    modal.remove();
+    document.body.style.overflow = oldOverflow;
+    modal = null;
+    input = null;
+    method = null;
+    send("IdentityInputFocus", "0");
+  }
+
+  window.HorseDaysIdentityInput = function (callbackMethod, currentValue, limit) {
+    if (!Object.prototype.hasOwnProperty.call(inputKinds, callbackMethod)) {
+      console.warn("HorseDays: unsupported input callback", callbackMethod);
+      return;
+    }
+    if (modal) close();
+    method = callbackMethod;
+    var settings = inputKinds[method];
+    var max = Math.max(1, Math.min(100, Number(limit) || 24));
+    makeModal();
+    modal.querySelector('[data-role="title"]').textContent = settings.title;
+    modal.querySelector('[data-role="error"]').textContent = "";
+    input.placeholder = settings.placeholder;
+    input.maxLength = max;
+    input.value = String(currentValue || "").slice(0, max);
+    oldOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.body.appendChild(modal);
+    send("IdentityInputFocus", "1");
+    var canvas = document.getElementById("unity-canvas");
+    if (canvas && typeof canvas.blur === "function") canvas.blur();
+    // Focus directly in the click gesture for iOS; the visible field can also
+    // be tapped again if a browser prevents auto-opening the soft keyboard.
+    input.focus();
+    input.select();
+  };
+})();
+
+</script>
+</body>
 </html>
