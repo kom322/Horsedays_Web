@@ -4,7 +4,171 @@
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Unity WebGL Player | HorseDaysPrototype</title>
-  </head>
+  <script>
+/* HORSEDAYS_COMPRESSED_STORAGE_V1
+ * SaveStore calls into this synchronous bridge from BrowserSave.jslib.
+ * localStorage quota may be insufficient for large GameState JSON documents.
+ * A reversible LZW codec keeps the API synchronous without delaying saves.
+ * It reads uncompressed legacy saves unchanged and only replaces the value
+ * after a successful localStorage.setItem; failed writes retain the old save.
+ */
+(function () {
+  'use strict';
+  var MARKER = 'HDLZW1:';
+  var MAX_EXPANDED_BYTES = 32 * 1024 * 1024;
+  var KEY = 'horsedays.stable.v1';
+  var encoder = new TextEncoder();
+  var decoder = new TextDecoder('utf-8', { fatal: true });
+
+  function bytesToBase64(bytes) {
+    var parts = [];
+    for (var i = 0; i < bytes.length; i += 8192) {
+      var slice = bytes.subarray(i, i + 8192);
+      var bin = '';
+      for (var j = 0; j < slice.length; j++) bin += String.fromCharCode(slice[j]);
+      parts.push(bin);
+    }
+    // btoa on huge strings may cause stack/memory issues; process chunks.
+    var result = [];
+    var pending = '';
+    for (var p = 0; p < parts.length; p++) {
+      pending += parts[p];
+      var used = pending.length - (pending.length % 3);
+      if (used) { result.push(btoa(pending.slice(0, used))); pending = pending.slice(used); }
+    }
+    if (pending) result.push(btoa(pending));
+    return result.join('');
+  }
+
+  function lzwCompress(text) {
+    var source = encoder.encode(text);
+    if (source.length > MAX_EXPANDED_BYTES) throw new Error('Save exceeds the 32MiB safety limit');
+    if (source.length === 0) return MARKER + '0:';
+    var dictionary = new Map();
+    var codes = [];
+    var word = source[0];
+    var nextCode = 256;
+    for (var i = 1; i < source.length; i++) {
+      var character = source[i];
+      var key = word * 256 + character;
+      var hit = dictionary.get(key);
+      if (hit !== undefined) word = hit;
+      else {
+        codes.push(word);
+        if (nextCode < 65536) dictionary.set(key, nextCode++);
+        word = character;
+      }
+    }
+    codes.push(word);
+    var packed = new Uint8Array(codes.length * 2);
+    for (var c = 0; c < codes.length; c++) {
+      packed[c * 2] = codes[c] >>> 8;
+      packed[c * 2 + 1] = codes[c] & 255;
+    }
+    return MARKER + source.length.toString(36) + ':' + bytesToBase64(packed);
+  }
+
+  function lzwDecompress(data) {
+    if (typeof data !== 'string' || data.slice(0, MARKER.length) !== MARKER) return data;
+    var split = data.indexOf(':', MARKER.length);
+    if (split < 0) throw new Error('Corrupt save header');
+    var expected = parseInt(data.slice(MARKER.length, split), 36);
+    if (!Number.isSafeInteger(expected) || expected < 0 || expected > MAX_EXPANDED_BYTES)
+      throw new Error('Invalid saved data size');
+    var encoded = data.slice(split + 1);
+    if (expected === 0 && encoded === '') return '';
+    var raw = atob(encoded);
+    if (!raw.length || raw.length % 2) throw new Error('Corrupt compressed save');
+    var size = raw.length / 2;
+    var out = new Uint8Array(expected);
+    var prefix = new Uint16Array(65536);
+    var suffix = new Uint8Array(65536);
+    var stack = new Uint8Array(65536);
+    var nextCode = 256;
+    var current = (raw.charCodeAt(0) << 8) | raw.charCodeAt(1);
+    if (current > 255 || expected < 1) throw new Error('Invalid first save code');
+    out[0] = current;
+    var offset = 1;
+    var previous = current;
+
+    for (var at = 1; at < size; at++) {
+      current = (raw.charCodeAt(at * 2) << 8) | raw.charCodeAt(at * 2 + 1);
+      var count = 0;
+      var cursor = current;
+      var special = current === nextCode && nextCode < 65536;
+      if (special) cursor = previous;
+      else if (current >= nextCode) throw new Error('Invalid save code');
+      while (cursor >= 256) {
+        if (count >= stack.length) throw new Error('Overlong save dictionary entry');
+        stack[count++] = suffix[cursor];
+        cursor = prefix[cursor];
+      }
+      stack[count++] = cursor;
+      var first = cursor;
+      var needed = count + (special ? 1 : 0);
+      if (offset + needed > expected) throw new Error('Expanded save length overflow');
+      while (count) out[offset++] = stack[--count];
+      if (special) out[offset++] = first;
+      if (nextCode < 65536) {
+        prefix[nextCode] = previous;
+        suffix[nextCode] = first;
+        nextCode++;
+      }
+      previous = current;
+    }
+    if (offset !== expected) throw new Error('Expanded save size mismatch');
+    return decoder.decode(out);
+  }
+
+  function notifySaveError(error) {
+    var name = error && error.name ? String(error.name) : 'StorageError';
+    var quota = name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED';
+    var text = quota
+      ? 'HorseDays: セーブ容量が上限に達しました。既存データは削除せず、このエラーを報告してください。'
+      : 'HorseDays: ブラウザの保存が利用できません。通常モードで開き、サイトデータの保存が許可されているか確認してください。';
+    window.HorseDaysLastSaveError = { name: name, message: String(error && error.message || error), time: Date.now() };
+    console.error('HorseDays persistent save failed:', error);
+    var existing = document.getElementById('horsedays-storage-error');
+    if (!existing) {
+      existing = document.createElement('div');
+      existing.id = 'horsedays-storage-error';
+      existing.style.cssText = 'position:fixed;left:8px;right:8px;bottom:12px;z-index:2147483646;background:#8e2323;color:#fff;padding:12px;border-radius:10px;font:14px/1.5 sans-serif;box-shadow:0 4px 18px #0007';
+      document.body.appendChild(existing);
+    }
+    existing.textContent = text + ' (' + name + ')';
+  }
+
+  window.horseDaysStorage = {
+    read: function (key) {
+      var raw = localStorage.getItem(key || KEY);
+      return raw ? lzwDecompress(raw) : '';
+    },
+    readBackup: function (slot) {
+      var key = KEY + '.backup.' + String(slot);
+      var raw = localStorage.getItem(key);
+      return raw ? lzwDecompress(raw) : '';
+    },
+    write: function (key, value) {
+      if (typeof value !== 'string') throw new TypeError('HorseDays save must be a string');
+      var storageKey = key || KEY;
+      try {
+        var compressed = lzwCompress(value);
+        var payload = compressed.length < value.length ? compressed : value;
+        // setItem is atomic with respect to quota failure. Never delete the old save.
+        localStorage.setItem(storageKey, payload);
+        window.HorseDaysLastSaveError = null;
+        var errorBox = document.getElementById('horsedays-storage-error');
+        if (errorBox) errorBox.remove();
+      } catch (e) {
+        notifySaveError(e);
+        throw e; // BrowserSave.jslib interprets this as failure rather than success.
+      }
+    }
+  };
+})();
+
+</script>
+</head>
   <body style="text-align: center; padding: 0; border: 0; margin: 0;">
     <canvas id="unity-canvas" width=960 height=600 tabindex="-1" style="width: 960px; height: 600px; background: #1F1F20"></canvas>
     <script src="Build/game.loader.js"></script>
