@@ -1,0 +1,30 @@
+(() => {
+'use strict';
+if(!new URLSearchParams(location.search).has('live'))return;
+const feed=new HorseDaysLiveData.Feed(),D=HorseDaysSolid;
+addEventListener('click',()=>parent.HorseDaysUnlockRaceAudio?.(),{capture:true});
+let resolveReady;const ready=new Promise(resolve=>{resolveReady=resolve;});
+window.HorseDaysLiveRace={feed,ready,command(command){parent.postMessage({type:'horse-days-race-command',command},location.origin);}};
+D.race=()=>feed.rows(performance.now(),D);
+document.body.classList.add('live-race');
+document.querySelector('header small').textContent='HORSE DAYS · LIVE';
+document.querySelector('header>a').hidden=true;
+document.querySelector('footer').textContent='本編のレースを観戦中';
+for(const id of ['again','seek','shot'])document.getElementById(id).hidden=true;
+document.querySelector('.seek-label').hidden=true;
+const speed=document.getElementById('speed');
+document.querySelector('.info').append(speed);
+speed.setAttribute('aria-label','観戦の再生速度を切り替える');
+addEventListener('message',event=>{
+ if(event.source!==parent||event.origin!==location.origin||event.data?.type!=='horse-days-race-frame')return;
+ const s=event.data.frame;if(!feed.accept(s,performance.now()))return;
+ D.setClockwise(s.clockwise);resolveReady();
+ document.querySelector('h1').textContent=s.name+' '+s.grade;
+ const surface=HorseDaysLiveData.isDirt(s)?'ダート':'芝';
+ document.querySelector('.meta').textContent=s.venue+' · '+surface+s.distance+'m · '+s.runners.length+'頭';
+ const frames=[];for(const r of s.runners)frames[r.number-1]=HorseDaysLiveData.frameColor(r.number,s.runners.length);D.frames.splice(0,D.frames.length,...frames);
+ document.getElementById('race3d').setAttribute('aria-label',s.runners.length+'頭のレース中継');
+});
+addEventListener('error',()=>parent.postMessage({type:'horse-days-race-fallback'},location.origin));
+parent.postMessage({type:'horse-days-race-ready'},location.origin);
+})();
