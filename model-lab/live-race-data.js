@@ -1,3 +1,4 @@
+// HORSEDAYS_REAL_COURSE_V7: the live horse lanes use the same physical metres as the rails.
 (function(g,f){const api=f();if(typeof module==='object'&&module.exports)module.exports=api;else g.HorseDaysLiveData=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
 function valid(s){return !!(s&&Number.isFinite(s.distance)&&s.distance>0&&Number.isFinite(s.time)&&Array.isArray(s.runners)&&s.runners.length>=2&&s.runners.length<=18&&s.runners.every(r=>Number.isInteger(r.number)&&r.number>=1&&r.number<=18&&Number.isFinite(r.ran)&&Number.isFinite(r.lane)&&Number.isFinite(r.progress)));}
@@ -30,8 +31,8 @@ class Feed{
  const blend=closing*closing*(3-2*closing);
  const gapScale=spacing+(scale-spacing)*blend;
  const anchor=leaderRan*scale;
- return s.runners.map(r=>{const ran=r.ran,lane=r.lane,visualRan=anchor-(leaderRan-ran)*gapScale,offset=Math.max(-11,Math.min(11,(lane-(s.laneCenter??(count-1)/2))*(s.laneWidth||1.15))),point=D.course(D.S/2+visualRan/2000*D.L,offset),frame=frameColor(r.number,count);
- return {...point,number:r.number,name:r.name,ran:visualRan,actualRan:ran,progress:r.progress,rank:r.rank,finished:r.finished,fallen:r.fallen,dashing:!!r.dashing,finish:Number.POSITIVE_INFINITY,lane:offset,trackHalfWidth:Math.max(4,(count-1)/2*(s.laneWidth||1.15)+1),appearance:Math.abs(r.appearance||0)%8,appearanceSeed:Math.abs(r.appearance||0),coatHex:r.coatHex,silkAccent:r.silkAccent,silkPattern:r.silkPattern,silk:r.silkHex|| (r.silk>0&&r.silk<=8?['#ffb81a','#ff0000','#00ffff','#00ff00','#ff00ff','#ffffff','#ff801a','#6666ff'][r.silk-1]:D.silks[frame-1])};}).sort((a,b)=>a.rank-b.rank);
+ return s.runners.map(r=>{const ran=r.ran,lane=r.lane,visualRan=anchor-(leaderRan-ran)*gapScale,offset=Math.max(-((D.trackWidthMeters/2-.8)/D.visualScale),Math.min((D.trackWidthMeters/2-.8)/D.visualScale,(lane-(s.laneCenter??(count-1)/2))*(s.laneWidth||1.15)/D.visualScale)),point=D.course(D.S/2+visualRan/2000*D.L,offset),frame=frameColor(r.number,count);
+ return {...point,number:r.number,name:r.name,ran:visualRan,actualRan:ran,progress:r.progress,rank:r.rank,finished:r.finished,fallen:r.fallen,dashing:!!r.dashing,finish:Number.POSITIVE_INFINITY,lane:offset,trackHalfWidth:(D.trackWidthMeters/2)/D.visualScale,appearance:Math.abs(r.appearance||0)%8,appearanceSeed:Math.abs(r.appearance||0),coatHex:r.coatHex,silkAccent:r.silkAccent,silkPattern:r.silkPattern,silk:r.silkHex|| (r.silk>0&&r.silk<=8?['#ffb81a','#ff0000','#00ffff','#00ff00','#ff00ff','#ffffff','#ff801a','#6666ff'][r.silk-1]:D.silks[frame-1])};}).sort((a,b)=>a.rank-b.rank);
  }
 }
 return {Feed,valid,frameColor,isDirt};

@@ -1,7 +1,19 @@
 (function(g,f){const a=f();if(typeof module==='object'&&module.exports)module.exports=a;else g.HorseDaysSolid=a;})(typeof globalThis!=='undefined'?globalThis:this,function(){
-const PI=Math.PI,TAU=2*PI,R=350,S=900,L=2*S+TAU*R,clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);},mix=(a,b,t)=>a+(b-a)*t,mod=(x,n)=>(x%n+n)%n;
+const PI=Math.PI,TAU=2*PI;let R=350,S=900,L=2*S+TAU*R,visualScale=1,trackWidthMeters=34;const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);},mix=(a,b,t)=>a+(b-a)*t,mod=(x,n)=>(x%n+n)%n;
 let courseClockwise=true;
 function setClockwise(value){courseClockwise=!!value;}
+// HORSEDAYS_REAL_COURSE_V7: Geometry in simulated model units; scale converts to displayed metres.
+// Approximates a lap as two straight sections and two semicircles, not an exact survey of Tokyo.
+function setCourseDimensions(options){
+ const lap=Number(options.lapMeters),straight=Number(options.straightMeters),scale=Number(options.scale);
+ if(!(lap>2*straight&&straight>0&&scale>0&&scale<=2))throw Error('Invalid horse-track dimensions');
+ S=straight/scale;
+ R=(lap-2*straight)/(TAU*scale);
+ L=2*S+TAU*R;
+ visualScale=scale;
+ trackWidthMeters=Number(options.widthMeters)||34;
+}
+
 function course(s,offset=0){s=mod(s,L);let x,z,dx,dz;if(s<S){x=-S/2+s;z=-R;dx=1;dz=0;}else if(s<S+PI*R){const a=-PI/2+(s-S)/R;x=S/2+R*Math.cos(a);z=R*Math.sin(a);dx=-Math.sin(a);dz=Math.cos(a);}else if(s<2*S+PI*R){x=S/2-(s-S-PI*R);z=R;dx=-1;dz=0;}else{const a=PI/2+(s-2*S-PI*R)/R;x=-S/2+R*Math.cos(a);z=R*Math.sin(a);dx=-Math.sin(a);dz=Math.cos(a);}const direction=courseClockwise?-1:1;return {x:(x+dz*offset)*direction,z:-(z-dx*offset),dx:dx*direction,dz:-dz};}
 const names=['ホシノダッシュ','ムーンホープ','ナツノウィング','リバースター','レッドリーフ','シロガネロード','アオゾラブリーズ','ハルノホープ','サニーステップ','ムーンウィング','ツバサノロード','グリーンブリーズ','グリーンロード','シロガネベル','ミナミノロード','カゼノウィング','ユメノステージ'];
 const frames=[1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,8],silks=['#f4f1df','#303437','#da4843','#477ed4','#e4b234','#38a35e','#e58535','#dc81ac'];
@@ -43,5 +55,5 @@ function commentary(time,rows,previous,cycle=0){const lead=rows[0],tag=r=>r.numb
  if(kind===2){const r=rows[Math.min(10,rows.length-1)];return {number:r.number,text:'後方からは'+tag(r)+'。残り'+Math.max(0,Math.round(2000-r.ran))+'m、ここからの仕掛けに注目です。'};}
  const r=rows[1+cycle%Math.min(5,rows.length-1)];return {number:r.number,text:tag(r)+'は'+r.rank+'番手。'+(time>85?'最後の直線へ、前を追う脚は残っているか。':'折り合いをつけて、前の馬群を追走しています。')};
 }
-return {setClockwise,course,race,camera,fitCamera,frameCamera,cameraSubjects,commentary,shots,keys,L,S,R,names,frames,silks,I,mul,look,perspective,project,sub,cross,norm,dot,clamp,smooth,mix};});
+return {setClockwise,setCourseDimensions,course,race,camera,fitCamera,frameCamera,cameraSubjects,commentary,shots,keys,get L(){return L;},get S(){return S;},get R(){return R;},get visualScale(){return visualScale;},get trackWidthMeters(){return trackWidthMeters;},names,frames,silks,I,mul,look,perspective,project,sub,cross,norm,dot,clamp,smooth,mix};});
 
