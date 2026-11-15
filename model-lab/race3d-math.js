@@ -4,17 +4,43 @@ let courseClockwise=true;
 function setClockwise(value){courseClockwise=!!value;}
 // HORSEDAYS_REAL_COURSE_V7: Geometry in simulated model units; scale converts to displayed metres.
 // Approximates a lap as two straight sections and two semicircles, not an exact survey of Tokyo.
+// HORSEDAYS_COURSES_V8: measured lap length & straight length, curved sections are shape approximations.
+let halfArc=PI*R,ellipseX=R,ellipseZ=R,arcTable=[0],courseStraightOnly=false;
 function setCourseDimensions(options){
- const lap=Number(options.lapMeters),straight=Number(options.straightMeters),scale=Number(options.scale);
- if(!(lap>2*straight&&straight>0&&scale>0&&scale<=2))throw Error('Invalid horse-track dimensions');
- S=straight/scale;
- R=(lap-2*straight)/(TAU*scale);
- L=2*S+TAU*R;
- visualScale=scale;
- trackWidthMeters=Number(options.widthMeters)||34;
+  const lap=Number(options.lapMeters),straight=Number(options.straightMeters),scale=Number(options.scale)||1;
+  if(!(lap>0&&straight>0&&lap>2*straight&&scale>.05&&scale<=2))throw Error('Invalid course dimensions');
+  const shapeX=clamp(Number(options.shapeX)||1,.45,2),shapeZ=clamp(Number(options.shapeZ)||1,.45,2);
+  const steps=192;const raw=[0];let arc=0,px=shapeX*Math.cos(-PI/2),pz=shapeZ*Math.sin(-PI/2);
+  for(let i=1;i<=steps;i++){
+    const a=-PI/2+PI*i/steps,x=shapeX*Math.cos(a),z=shapeZ*Math.sin(a);
+    arc+=Math.hypot(x-px,z-pz);raw.push(arc);px=x;pz=z;
+  }
+  const factor=(lap-2*straight)/(2*arc*scale);
+  ellipseX=shapeX*factor;ellipseZ=shapeZ*factor;
+  S=straight/scale;halfArc=(lap-2*straight)/(2*scale);L=2*S+2*halfArc;
+  R=Math.sqrt(ellipseX*ellipseZ);
+  arcTable=raw.map(v=>v/arc*halfArc);
+  visualScale=scale;trackWidthMeters=Number(options.widthMeters)||30;
+  courseStraightOnly=!!options.straightOnly;
+}
+function arcAngle(distance){
+  const d=clamp(distance,0,halfArc),n=arcTable.length-1;
+  let lo=0,hi=n;while(hi-lo>1){let mid=(lo+hi)>>1;if(arcTable[mid]<d)lo=mid;else hi=mid;}
+  const u=(d-arcTable[lo])/Math.max(1e-8,arcTable[hi]-arcTable[lo]);
+  return -PI/2+PI*(lo+u)/n;
+}
+function course(s,offset=0){
+  s=mod(s,L);let x,z,dx,dz;
+  if(courseStraightOnly){x=s-L/2;z=0;dx=1;dz=0;}
+  else if(s<S){x=-S/2+s;z=-ellipseZ;dx=1;dz=0;}
+  else if(s<S+halfArc){const a=arcAngle(s-S);x=S/2+ellipseX*Math.cos(a);z=ellipseZ*Math.sin(a);dx=-ellipseX*Math.sin(a);dz=ellipseZ*Math.cos(a);}
+  else if(s<2*S+halfArc){x=S/2-(s-S-halfArc);z=ellipseZ;dx=-1;dz=0;}
+  else {const a=arcAngle(s-2*S-halfArc)+PI;x=-S/2+ellipseX*Math.cos(a);z=ellipseZ*Math.sin(a);dx=-ellipseX*Math.sin(a);dz=ellipseZ*Math.cos(a);}
+  const len=Math.hypot(dx,dz)||1;dx/=len;dz/=len;
+  const dir=courseClockwise?-1:1;
+  return {x:(x+dz*offset)*dir,z:-(z-dx*offset),dx:dx*dir,dz:-dz};
 }
 
-function course(s,offset=0){s=mod(s,L);let x,z,dx,dz;if(s<S){x=-S/2+s;z=-R;dx=1;dz=0;}else if(s<S+PI*R){const a=-PI/2+(s-S)/R;x=S/2+R*Math.cos(a);z=R*Math.sin(a);dx=-Math.sin(a);dz=Math.cos(a);}else if(s<2*S+PI*R){x=S/2-(s-S-PI*R);z=R;dx=-1;dz=0;}else{const a=PI/2+(s-2*S-PI*R)/R;x=-S/2+R*Math.cos(a);z=R*Math.sin(a);dx=-Math.sin(a);dz=Math.cos(a);}const direction=courseClockwise?-1:1;return {x:(x+dz*offset)*direction,z:-(z-dx*offset),dx:dx*direction,dz:-dz};}
 const names=['ホシノダッシュ','ムーンホープ','ナツノウィング','リバースター','レッドリーフ','シロガネロード','アオゾラブリーズ','ハルノホープ','サニーステップ','ムーンウィング','ツバサノロード','グリーンブリーズ','グリーンロード','シロガネベル','ミナミノロード','カゼノウィング','ユメノステージ'];
 const frames=[1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,8],silks=['#f4f1df','#303437','#da4843','#477ed4','#e4b234','#38a35e','#e58535','#dc81ac'];
 function race(time){const t=Math.max(0,time-1),finish=[121.9,118.0,121.0,123.0,122.2,123.6,120.8,124.3,121.4,122.6,118.6,124,122.4,117.7,121.7,119.4,119.8];const rows=names.map((name,i)=>{const done=t>=finish[i];const delay=(i===8||i===2)?.03:(.30+(i%6)*.16),effective=Math.max(0,t-delay*(1-smooth((t-85)/30)));let ran=2000*effective/finish[i];const settling=(1-Math.exp(-t/6)),early=(i===8||i===2?12:0)*settling*(1-smooth((t-92)/24));ran+=early;const lane0=(i-8)*1.45,laneTarget=clamp(-8+(i%5)*2.0+(i>7?1.4:0),-11,11);const lane=mix(lane0,laneTarget,smooth(t/6))+Math.sin(t*.19+i)*.25*settling;const p=course(S/2+ran/2000*L,lane);return {...p,number:i+1,name,ran,progress:Math.min(1,ran/2000),finished:done,finish:finish[i],lane,appearance:(i*7+2)%4,silk:silks[frames[i]-1]};});rows.sort((a,b)=>a.finished&&b.finished?a.finish-b.finish:b.ran-a.ran);rows.forEach((r,i)=>r.rank=i+1);return rows;}

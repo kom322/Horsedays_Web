@@ -19,17 +19,14 @@ function quad(out,points,color){if(D.cross(D.sub(points[1],points[0]),D.sub(poin
 // Build the scenery only after the live race has supplied its actual direction.
 if(LIVE)await LIVE.ready;
 const dirtRace=!!LIVE&&HorseDaysLiveData.isDirt(LIVE.feed.current);
-// HORSEDAYS_REAL_COURSE_V7: the horse mesh is ~2.91 units from nose to tail.
-// Actual Tokyo data: turf A 2083.1 m/lap, 525.9 m straight, 31-41 m wide;
-// dirt: 1899 m/lap, 501.6 m straight, 25 m wide (JRA official figures).
-// All other venues retain a clearly approximate, generic stadium geometry.
-const HD_VISUAL_SCALE=typeof TRACK_SCALE==='number'?TRACK_SCALE:1;
-const hdVenue=String(LIVE?.feed.current?.venue||'東京');
-const hdTokyo=hdVenue.includes('東京')||/Tokyo/i.test(hdVenue);
-const hdWidth=hdTokyo?(dirtRace?25:34):(dirtRace?25:30);
-const hdDimensions=hdTokyo?(dirtRace?{lapMeters:1899,straightMeters:501.6}:{lapMeters:2083.1,straightMeters:525.9}):{lapMeters:2000,straightMeters:480};
-D.setCourseDimensions({...hdDimensions,widthMeters:hdWidth,scale:HD_VISUAL_SCALE});
-
+// HORSEDAYS_COURSES_V8: real per-venue profile, not the old generic Tokyo fallback.
+const hdFrame=LIVE?.feed.current||{venue:'東京',distance:2000,courseName:'東京・芝',dirt:false};
+const hdProfile=HorseDaysCourseProfiles.resolve({...hdFrame,dirt:dirtRace});
+const hdWidth=hdProfile.widthMeters;
+const hdVenue=hdFrame.venue;
+const hdTokyo=hdVenue==='東京';
+const HD_VISUAL_SCALE=1; // A virtual metre is now one WebGL model unit, preserving horse/course proportions.
+D.setCourseDimensions({...hdProfile,scale:HD_VISUAL_SCALE});
 const world=[],signs=[],nearRail=[],stands=[],trackEdge=hdWidth/(2*HD_VISUAL_SCALE),innerEdge=-trackEdge-24/HD_VISUAL_SCALE,innerRail=-trackEdge-6/HD_VISUAL_SCALE,railPosts=512;
 object(world,M.cube,[0,-.06,0],[3600,.03,3600],'#577b39');
 function band(a,b,c1,c2,steps=512){for(let i=0;i<steps;i++){const t=i*D.L/steps,u=(i+1)*D.L/steps,p=D.course(t,a),q=D.course(u,a),r=D.course(u,b),s=D.course(t,b);quad(world,[[p.x,.015,p.z],[q.x,.015,q.z],[r.x,.015,r.z],[s.x,.015,s.z]],i%12<6?c1:c2);}}
@@ -110,7 +107,7 @@ if(now-hdLastTop3>350){
   const gap=i===0?'先頭':('+'+Math.max(0,(leader.actualRan??leader.ran)-(r.actualRan??r.ran)).toFixed(1)+'m');
   return (i+1)+'位 '+r.number+'番 '+r.name+' '+gap;
  });
- hdTop3.textContent=(hdTokyo?'東京モデル ':'参考コース ')+(dirtRace?'ダート':'芝')+'／幅'+hdWidth+'m　'+names.join('  ｜  ');
+ hdTop3.textContent=hdProfile.label+'／代表幅'+hdWidth+'m　'+names.join('  ｜  ');
  hdLastTop3=now;
 }
 const gaits=gallopMotion.update(rows,elapsed);
