@@ -58,3 +58,9 @@
  .live-race #voice-toggle {float:none;display:block;min-height:44px;margin:6px 0 0}
  .live-race #commentary {overflow-wrap:anywhere}
 }
+/* High-contrast ground-condition board for the live race broadcast. */
+.race-ground-board{display:flex;justify-content:center;align-items:center;gap:14px;background:linear-gradient(110deg,#153324,#203a25);border:2px solid #d7b754;border-radius:9px;padding:6px 12px;margin:8px 0;color:#f4eabe;box-shadow:0 2px 8px #0004}
+.race-ground-board[hidden]{display:none!important}
+.ground-board-label{font-size:13px;font-weight:750;letter-spacing:.08em}
+#ground-status{font-size:clamp(22px,4.5vw,32px);font-weight:900;line-height:1.25;letter-spacing:.045em;color:#ffe03b;text-shadow:0 2px 2px #000d,0 0 12px #ffcd4b42}
+@media(max-width:480px){.race-ground-board{margin:5px 0;padding:5px 9px;gap:10px}.ground-board-label{font-size:12px}#ground-status{font-size:26px}}

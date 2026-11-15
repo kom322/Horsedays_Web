@@ -1,29 +1,31 @@
-HorseDays — 旧スマホ専用3Dレース観戦画面 復旧パッチ (2026-11-15)
+HorseDays スマホ観戦3D 走行モーション v4 — 改良版 (2026-11-15)
 
-【概要】
-今のUnity WebGLゲームを維持し、通常のレース観戦時だけ、以前の phone-web の専用観戦画面を重ねて表示します。
-今回送ってもらった race.html、race3d.js、broadcast-camera.js、race-speech.js などを利用します。
-Unity の RaceViewInk.cs と BrowserSave.jslib に既にある連携を使用するため、対応する v18 ビルドなら Unity の再ビルドは不要です。
+【今回の重点】
+1. ギャロップの四肢を４つの独立した接地フェーズへ分割（後肢→前肢→滞空）
+2. 蹄の動きに「着地中はほぼ接地」「空中では回収＋持ち上げ」を導入
+3. 肩・股関節、前肢の膝・後肢の飛節に相当する位置を2リンクIKで近似
+4. 尻尾は後肢とのメッシュ変形範囲を厳密に分離
+5. 首・頭の連動、体のわずかな屈伸、騎手の姿勢追従を調整
+6. スマホ負荷対策：アップになった馬にだけ関節計算、遠景は軽量アニメ
+7. 既存のコース座標1/2・表示上の馬速1/2・黄色い馬場状態・実況/隊列を維持
 
-【GitHubへの反映方法】
-1. 現在の GitHub リポジトリ Horsedays_Web のフォルダをバックアップしてください。
-2. この ZIP を解凍し、README.txt 以外の中身を GitHub Desktop の Repository > Show in Explorer で開くフォルダにコピーしてください。
-   index.html がリポジトリ直下に来るようにします。Build/ フォルダは既存のものを残します。
-3. GitHub Desktop で Commit to main → Push origin を行います。
-4. 公開URL https://kom322.github.io/Horsedays_Web/ を再読み込みして観戦レースを試してください。
-5. カメラが戻らない、描画が止まる場合は、ブラウザのコンソールと画面のスクリーンショットを記録してください。
+【適用条件】
+すでに「スマホ3D馬・競馬場リアル化 v1」が公開済みのGitHub Pages版を想定。
+v2/v3の差分も含むので、v1からまとめて適用可能。zip内の model-lab を
+GitHub Desktop -> Repository -> Show in Explorer から開くリポジトリ直下に統合し、
+同名ファイルを上書き → Commit to main → Push origin。
+Build/ と index.html には変更を加えません。Unityの再ビルドは不要。
 
-【重要な制約】
-- 元の phone-web にあった horse/jockey の高品質メッシュ (classic/*.bin、new-horse/*.bin) と実テクスチャは今回の添付には含まれていません。
-  代わりに元の JavaScript 内の簡易3D馬モデルから生成した代替メッシュを同梱しています。
-  したがって以前と完全に同じ馬体の3D画質にはなりません。
-- Unity に加え iframe 側でも WebGL を動かすため、スマホによっては動作が重くなる可能性があります。
-- Unity 実機・公開サイトでの総合テストは未実施です。JavaScript構文、必要ファイル、連携の模擬テストを実施します。
-- index.html に牧場名入力の修正とセーブ圧縮の修正が含まれています。既存の保存データは削除しません。
-- 将来 Unity で再ビルドしたら index.html が上書きされるため、再度このパッチの index.html および関連ファイルを反映してください。
+【正確な限界】
+このアニメは既存の馬メッシュをGPUで変形する骨格IK「近似」です。
+Blenderで関節をスキニングした完全なリグ/モーションキャプチャとは異なります。
+サラブレッドの形や歩様が写真並みに自然になる保証はありません。
+既存のレース計算/馬の能力/着順/タイムは変更していません。
+現在の公開URLはGitHubへPushするまで変わりません。
 
-【元の高品質3Dモデルを戻す場合】
-元の phone-web/public/model-lab フォルダの new-horse/ と classic/ のうち、
- horse-fixed.bin / horse-low-fixed.bin / horse.jpg、jockey.bin / jockey-low.bin / jockey.png だけを送ってください。
-（ZIP全体を送る必要はありません。）
-モデルを元に戻す時は model-lab/race.html 中の HorseDaysBundledFallbackModels=true を false に変更します。
+【確認項目】
+- レース中、左右4肢が同時に動かず、別々の着地・蹴り出しをしているか
+- 蹄が地面にめり込まないか、尻尾が後肢に付いて動かないか
+- 体の上下動・首の振りが不自然に大きくなっていないか
+- スマホで実況・隊列・黄色い馬場表示・ゴール後終了が維持されているか
+- 18頭レースでコマ落ちしないか（端末によって異なります）

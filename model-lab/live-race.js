@@ -22,6 +22,11 @@ addEventListener('message',event=>{
  document.querySelector('h1').textContent=s.name+' '+s.grade;
  const surface=HorseDaysLiveData.isDirt(s)?'ダート':'芝';
  document.querySelector('.meta').textContent=s.venue+' · '+surface+s.distance+'m · '+s.runners.length+'頭';
+  const status=document.getElementById('ground-board'),value=document.getElementById('ground-status');
+  const raw=typeof s.going==='string'?s.going.trim():'';
+  const condition=raw.split(/[／/]/).pop().trim();
+  if(status&&value){status.hidden=!condition;if(condition)value.textContent=surface+'馬場  '+condition;}
+
  const frames=[];for(const r of s.runners)frames[r.number-1]=HorseDaysLiveData.frameColor(r.number,s.runners.length);D.frames.splice(0,D.frames.length,...frames);
  document.getElementById('race3d').setAttribute('aria-label',s.runners.length+'頭のレース中継');
 });
