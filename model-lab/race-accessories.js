@@ -1,3 +1,4 @@
+/* HORSEDAYS_JOCKEY_VISUAL_V17: independent knee/forearm joints and visor-compatible rider parts. */
 /* HorseDays v5: frame-colored saddlecloth/horse number and complete rider limbs.
  * Generated geometry uses the exact 13-float vertex layout of race3d.js.
  * Exported as a plain function for static/Node regression testing.
@@ -23,12 +24,12 @@
   for(const side of [-1,1]){
    const shoulder=[side*.14,2.19,.04],elbow=[side*.23,2.04,.26],hand=[side*.18,1.92,.51];
    limb(shoulder,elbow,.065,'#f5ebdb',4,12);
-   limb(elbow,hand,.052,'#f5ebdb',4,12);
-   cuff(hand,.047,'#d3a280',0,12);
+   limb(elbow,hand,.052,'#f5ebdb',4,14);
+   cuff(hand,.047,'#d3a280',0,14);
    const hip=[side*.13,1.95,-.17],knee=[side*.31,1.69,.02],heel=[side*.34,1.44,-.09];
    limb(hip,knee,.092,'#efefe5',0,13);
-   limb(knee,heel,.067,'#302d2b',0,13);
-   cuff([side*.34,1.43,-.05],.08,'#242321',0,13);
+   limb(knee,heel,.067,'#302d2b',0,17);
+   cuff([side*.34,1.43,-.05],.08,'#242321',0,17);
   }
   // The cloth is always double-sided: the outside of either flank carries the same horse number.
   // The cloth hue follows its frame (waku) and the numeral follows its actual runner number (umaban).
