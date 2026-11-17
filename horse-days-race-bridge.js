@@ -10,12 +10,16 @@
   var latestFrame = null;
   var pendingCommand = 0;
   var startTimer = null;
+  var frameWatchdog = null;
+  var lastFrameAt = 0;
   var loadSequence = 0;
   var origin = location.origin;
 
   function unmount() {
     clearTimeout(startTimer);
+    clearInterval(frameWatchdog);
     startTimer = null;
+    frameWatchdog = null;
     ready = false;
     rendered = false;
     latestFrame = null;
@@ -66,6 +70,7 @@
       unmount();
       pendingCommand = 0;
       latestFrame = frame;
+      lastFrameAt = Date.now();
       var sequence = ++loadSequence;
       var node = document.createElement('iframe');
       node.setAttribute('title', 'HorseDays 専用3Dレース中継');
@@ -79,11 +84,17 @@
       startTimer = setTimeout(function () {
         if (element === node && loadSequence === sequence && !rendered) fail('renderer load timeout');
       }, 30000);
+      // Even when WebGL is displayed, do not leave a frozen iframe hiding Unity.
+      frameWatchdog = setInterval(function () {
+        if (element === node && ready && !document.hidden &&
+            Date.now() - lastFrameAt > 5000) fail('Unity race frame timeout');
+      }, 1000);
       return 1;
     },
     update: function (frame) {
       if (!element || !frame) return;
       latestFrame = frame;
+      lastFrameAt = Date.now();
       sendFrame(frame);
     },
     command: function () {

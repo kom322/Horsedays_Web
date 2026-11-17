@@ -349,7 +349,22 @@ const coursePosition=new HorseDaysCoursePosition.Display(stage);
 const elevation=new HorseDaysElevation.Display($('elevation-profile'));
 const fieldPositions=new HorseDaysFieldPositions.Display($('map')),lc=$('course-labels').getContext('2d');
 function uniformColor(name,c){gl.uniform3fv(U[name],M.tint(c));}
-function draw(now){requestAnimationFrame(draw);if(finishSent||document.hidden||gl.isContextLost()){last=0;return;}const dt=last?Math.min(.06,(now-last)/1000):0;last=now;if(LIVE){const s=LIVE.feed.current;if(!s)return;elapsed=LIVE.feed.time(performance.now());paused=s.paused;rate=s.rate;setText($('pause'),paused?'再生':'一時停止');setText($('speed'),'速度 ×'+rate);}else if(!paused)elapsed=Math.min(130,elapsed+dt*rate);
+let firstFrameRendered=false, renderFailureReported=false;
+function draw(now){
+ requestAnimationFrame(draw);
+ if(finishSent||document.hidden)return;
+ try {drawFrame(now);}
+ catch(e){
+  if(!renderFailureReported){console.error('HorseDays race render failed:',e);renderFailureReported=true;}
+  const error=$('error');
+  if(error){error.hidden=false;error.textContent='観戦画面に問題が発生したため、Unity表示へ戻します。';}
+  if(LIVE){
+    finishSent=true;
+    parent.postMessage({type:'horse-days-race-fallback'},location.origin);
+  }
+ }
+}
+function drawFrame(now){if(gl.isContextLost()){last=0;return;}const dt=last?Math.min(.06,(now-last)/1000):0;last=now;if(LIVE){const s=LIVE.feed.current;if(!s)return;elapsed=LIVE.feed.time(performance.now());paused=s.paused;rate=s.rate;setText($('pause'),paused?'再生':'一時停止');setText($('speed'),'速度 ×'+rate);}else if(!paused)elapsed=Math.min(130,elapsed+dt*rate);
 speech.setContext(true,paused,!!(LIVE&&parent.HorseDaysRaceMuted));
 setText(voiceButton,speech.label());
 const rows=D.race(elapsed);if(!rows.length)return;
@@ -441,6 +456,10 @@ if(named){const q=D.project(vp,[named.x,2.85,named.z],rect.width,rect.height),vi
  talking.style.width=bw+'px';talking.style.transform='translate3d('+x+'px,'+y+'px,0)';const foot=D.project(vp,[named.x,1.3,named.z],rect.width,rect.height),dx=foot.x-(x+bw/2),dy=foot.y-(y+26);cueLine.hidden=false;cueLine.style.width=Math.hypot(dx,dy)+'px';cueLine.style.transform='translate3d('+(x+bw/2)+'px,'+(y+26)+'px,0) rotate('+Math.atan2(dy,dx)+'rad)';}
 }
 if(now-lastHud<dt*1000+1)for(const r of rows){const b=runnerButtons[r.number-1];setText(b,r.rank+'位  '+r.number+' '+r.name);const pressed=String(focus===r.number);if(b.getAttribute('aria-pressed')!==pressed)b.setAttribute('aria-pressed',pressed);}
+if(LIVE&&!firstFrameRendered){
+  firstFrameRendered=true;
+  parent.postMessage({type:'horse-days-render-ready'},location.origin);
+}
 if(LIVE?.feed.current.endsBroadcast&&rows.every(r=>r.finished||r.fallen)){
  finishSent=true;
  speech.finish();
@@ -449,7 +468,6 @@ if(LIVE?.feed.current.endsBroadcast&&rows.every(r=>r.finished||r.fallen)){
 
 }
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();if(LIVE)LIVE.command(3);$('error').hidden=false;$('error').textContent='立体表示が停止しました。再読み込みしてください。';});document.addEventListener('visibilitychange',()=>last=0);
-if(LIVE)parent.postMessage({type:'horse-days-render-ready'},location.origin);
 requestAnimationFrame(draw);
 })().catch(e=>{document.getElementById('error').hidden=false;document.getElementById('error').textContent='表示を開けませんでした。再読み込みしてください。';if(window.HorseDaysLiveRace)parent.postMessage({type:'horse-days-race-fallback'},location.origin);console.error(e);});
 

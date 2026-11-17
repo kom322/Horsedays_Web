@@ -58,3 +58,25 @@
  .live-race #voice-toggle {float:none;display:block;min-height:44px;margin:6px 0 0}
  .live-race #commentary {overflow-wrap:anywhere}
 }
+/* HD_SPECTATOR_REPAIR_V1: keep the running order visible below the live picture. */
+@media (max-width: 600px) and (orientation: portrait) {
+  .live-race #race-stage {
+    aspect-ratio: auto;
+    height: clamp(235px, 37svh, 430px);
+  }
+  .live-race .field-position {
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: auto;
+    height: clamp(126px, 20svh, 172px);
+    overflow: hidden;
+  }
+  .live-race .field-position #map {
+    display: block;
+    width: 100%;
+    flex: 1 1 auto;
+    height: calc(100% - 28px);
+    min-height: 90px;
+    aspect-ratio: auto;
+  }
+}
